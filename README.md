@@ -74,12 +74,14 @@ This command will:
 - Start PostgreSQL (`db`) and Redis (`redis`) services.
 - Build and run the Django application (`web`).
 - Run the Celery worker (`celery`).
+- Run the Celery Beat scheduler (`celery-beat`).
 
 ### 5️⃣ **Initialize the Django Project**
 Apply migrations and create a superuser:
 ```sh
 docker-compose run web python manage.py makemigrations
 docker-compose run web python manage.py migrate
+docker-compose run web python manage.py migrate django_celery_beat
 docker-compose run web python manage.py createsuperuser
 ```
 Follow the prompts to create a superuser account.
@@ -129,9 +131,9 @@ django-library-tracking-system/
 ### 🔑 **Django Admin Interface**
 - **URL:** [http://localhost:8000/admin/](http://localhost:8000/admin/)
 - **Login:** Use the superuser credentials you created.
-- **Functionality:** Manage authors, books, members, and loans through the admin panel.
+- **Functionality:** Manage authors, books, members, loans, and scheduled Celery tasks through the admin panel.
 
-### 📌 **API Endpoints**
+### 📌 **Core API Endpoints**
 | Method | Endpoint          | Description |
 |--------|------------------|-------------|
 | `GET`  | `/api/authors/`  | Fetch all authors |
@@ -142,6 +144,106 @@ django-library-tracking-system/
 | `POST` | `/api/books/`    | Create a new book |
 | `POST` | `/api/members/`  | Create a new member |
 | `POST` | `/api/loans/`    | Create a new loan |
+| `POST` | `/api/books/{id}/loan/` | Loan a book to member |
+| `POST` | `/api/books/{id}/return_book/` | Return a loaned book |
+
+### 🔄 **Background Task Endpoints**
+| Method | Endpoint          | Description |
+|--------|------------------|-------------|
+| `POST` | `/api/tasks/overdue-reminders/` | Trigger overdue book reminders |
+| `POST` | `/api/tasks/monthly-report/` | Generate monthly statistics report |
+| `POST` | `/api/tasks/inventory-check/` | Check for low inventory books |
+| `POST` | `/api/tasks/fetch-metadata/` | Fetch book metadata from external API |
+| `POST` | `/api/loans/batch_return/` | Batch process loan returns |
+
+📖 **For detailed API documentation, see [API_DOCUMENTATION.md](API_DOCUMENTATION.md)**
+
+---
+
+## 🧪 **Testing & Code Quality**
+
+### Run Tests
+```sh
+# Run all tests
+make test
+# or
+pytest
+
+# Run with coverage
+make coverage
+# or
+pytest --cov=library --cov=library_system --cov-report=html
+```
+
+### Code Quality Checks
+```sh
+# Run all quality checks (lint + format + isort)
+make quality
+
+# Individual checks
+make lint          # Flake8 linting
+make format        # Black formatting
+make isort         # Import sorting
+```
+
+### Install Pre-commit Hooks
+```sh
+make install-dev
+# or
+pre-commit install
+```
+
+---
+
+## 🔄 **Celery Background Tasks**
+
+This application uses Celery for asynchronous task processing:
+
+### Automated Scheduled Tasks
+- **Daily**: Send overdue book reminders (14+ day grace period)
+- **Weekly**: Check and alert for low inventory books
+- **Monthly**: Generate library statistics report
+- **Monthly**: Clean up old returned loan records
+
+### On-Demand Tasks
+- Email notifications when books are loaned
+- Fetch book metadata from Google Books API
+- Batch process loan returns
+- Manual trigger of scheduled tasks via API
+
+### Monitor Celery
+```sh
+# View active tasks
+docker-compose exec celery celery -A library_system inspect active
+
+# View scheduled tasks
+docker-compose exec celery celery -A library_system inspect scheduled
+
+# View Celery Beat logs
+docker-compose logs celery-beat
+```
+
+---
+
+## 📚 **Additional Documentation**
+
+- **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - Comprehensive API reference with examples
+- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Technical implementation details and architecture
+
+---
+
+## 🎯 **Key Features**
+
+✅ RESTful API with Django REST Framework
+✅ Async background task processing with Celery
+✅ Scheduled periodic tasks with Celery Beat
+✅ External API integration (Google Books)
+✅ 80%+ test coverage with pytest
+✅ Code quality enforcement (Flake8, Black, Isort)
+✅ Pre-commit hooks for automated checks
+✅ Docker containerization for easy deployment
+✅ CI/CD pipeline with GitHub Actions
+✅ Comprehensive documentation
 
 ---
 

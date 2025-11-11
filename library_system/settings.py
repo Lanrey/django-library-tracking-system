@@ -24,8 +24,9 @@ INSTALLED_APPS = [
     # Third-party apps
     'rest_framework',
     'corsheaders',
+    'django_celery_beat',
     # Local apps
-    'library', 
+    'library',
 ]
 
 MIDDLEWARE = [
@@ -111,6 +112,30 @@ CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://redis:6379/0
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+
+# Celery Beat Schedule
+CELERY_BEAT_SCHEDULE = {
+    'send-overdue-reminders-daily': {
+        'task': 'library.tasks.send_overdue_reminders',
+        'schedule': 86400.0,  #
+    },
+    'check-overdue-loans-daily': {
+        'task':'library.tasks.check_overdue_loans',
+        'schedule': 86400.0,  # Run daily
+    }
+}
+
+# Default Pagination Value
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10
+}
+
+# Use django-celery-beat for database-backed schedule
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 # Email Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For development

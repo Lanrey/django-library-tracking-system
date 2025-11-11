@@ -1,0 +1,21 @@
+[flake8]
+max-line-length = 100
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    migrations,
+    .pytest_cache,
+    htmlcov,
+    staticfiles,
+    .idea
+ignore =
+    E203,  # whitespace before ':'
+    E266,  # too many leading '#' for block comment
+    W503,  # line break before binary operator
+    E501,  # line too long (handled by black)
+per-file-ignores =
+    __init__.py:F401
+    settings.py:E501
+max-complexity = 10
