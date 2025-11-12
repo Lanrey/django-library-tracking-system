@@ -33,6 +33,9 @@ class MemberSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'user_id', 'membership_date']
 
 class LoanSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Loan model with computed fields.
+    """
     book = BookSerializer(read_only=True)
     book_id = serializers.PrimaryKeyRelatedField(
         queryset=Book.objects.all(), source='book', write_only=True
@@ -42,6 +45,23 @@ class LoanSerializer(serializers.ModelSerializer):
         queryset=Member.objects.all(), source='member', write_only=True
     )
 
+    # Add computed fields from model properties
+    is_overdue = serializers.ReadOnlyField()
+    days_until_due = serializers.ReadOnlyField()
+
     class Meta:
         model = Loan
-        fields = ['id', 'book', 'book_id', 'member', 'member_id', 'loan_date', 'return_date', 'is_returned']
+        fields = [
+            'id',
+            'book',
+            'book_id',
+            'member',
+            'member_id',
+            'loan_date',
+            'due_date',
+            'return_date',
+            'is_returned',
+            'is_overdue',
+            'days_until_due',
+        ]
+        read_only_fields = ['loan_date', 'due_date', 'is_overdue', 'days_until_due']

@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 class Author(models.Model):
     first_name = models.CharField(max_length=100)
@@ -36,12 +39,55 @@ class Member(models.Model):
         return self.user.username
 
 class Loan(models.Model):
+    """
+    Model representing a book loan to a member.
+    """
     book = models.ForeignKey(Book, related_name='loans', on_delete=models.CASCADE)
     member = models.ForeignKey(Member, related_name='loans', on_delete=models.CASCADE)
     loan_date = models.DateField(auto_now_add=True)
     return_date = models.DateField(null=True, blank=True)
     is_returned = models.BooleanField(default=False)
-    due_date = models.DateField(auto_now = loan_date + models.DurationField(days=14))
+    extension_days = models.PositiveIntegerField(default=0)
+
+    # Constants
+    LOAN_DURATION_DAYS = 14
+
+    @property
+    def due_date(self):
+        """
+        Calculate due date as loan_date + LOAN_DURATION_DAYS + extension_days.
+
+        Returns:
+            date: The due date (loan_date + 14 days + extension days)
+        """
+        if self.loan_date:
+            return self.loan_date + timedelta(days=self.LOAN_DURATION_DAYS + self.extension_days)
+        return timezone.now().date() + timedelta(days=self.LOAN_DURATION_DAYS + self.extension_days)
+
+    @property
+    def is_overdue(self):
+        """
+        Check if the loan is overdue.
+
+        Returns:
+            bool: True if loan is overdue, False otherwise
+        """
+        if self.is_returned:
+            return False
+        return timezone.now().date() > self.due_date
+
+    @property
+    def days_until_due(self):
+        """
+        Calculate days remaining until due date.
+
+        Returns:
+            int or None: Days until due (negative if overdue), None if returned
+        """
+        if self.is_returned:
+            return None
+        delta = self.due_date - timezone.now().date()
+        return delta.days
 
     def __str__(self):
         return f"{self.book.title} loaned to {self.member.user.username}"

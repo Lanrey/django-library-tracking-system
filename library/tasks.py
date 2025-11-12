@@ -59,33 +59,67 @@ def send_loan_notification(self, loan_id: int) -> Dict[str, str]:
 @shared_task
 def check_overdue_loans() -> Dict[str, int]:
     """
-    Check for overdue loans and log them.
+    Check for overdue loans and send email notifications.
     Scheduled to run daily via Celery Beat.
 
     Returns:
-        Dictionary with count of overdue loans
-        And also sends email notifications to members with overdue loans
+        Dictionary with count of overdue loans and emails sent
     """
     today = date.today()
+    grace_period = Loan.LOAN_DURATION_DAYS  # 14 days
+    overdue_cutoff = today - timedelta(days=grace_period)
+
+    # Get loans where loan_date + 14 days < today (i.e., loan_date < today - 14)
     overdue_loans = Loan.objects.filter(
-        is_returned=False, due_date__lt=today
-    ).select_related("book", "member__user")
+        is_returned=False, loan_date__lt=overdue_cutoff
+    ).select_related("book", "book__author", "member", "member__user")
+
+    emails_sent = 0
+    emails_failed = 0
 
     for loan in overdue_loans:
-        send_mail(
-            subject="Overdue Loans Reminder",
-            message=(
-                f"The following loans are overdue:\n\n"
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[loan.member_email],
-            fail_silently=False,
+        try:
+            # Calculate days overdue using the property
+            days_overdue = abs(loan.days_until_due) if loan.days_until_due else 0
 
-        )
+            send_mail(
+                subject="Overdue Loan Reminder",
+                message=(
+                    f"Hello {loan.member.user.username},\n\n"
+                    f'Your loaned book "{loan.book.title}" by {loan.book.author} '
+                    f"is now {days_overdue} days overdue.\n\n"
+                    f"Loan Date: {loan.loan_date}\n"
+                    f"Due Date: {loan.due_date}\n\n"
+                    f"Please return the book as soon as possible to avoid further late fees.\n\n"
+                    f"Thank you,\nLibrary Management"
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[loan.member.user.email],
+                fail_silently=False,
+            )
+            emails_sent += 1
+            logger.info(
+                f"Overdue notification sent for loan_id={loan.id}, "
+                f"member={loan.member.user.username}, days_overdue={days_overdue}"
+            )
+
+        except Exception as exc:
+            emails_failed += 1
+            logger.error(
+                f"Failed to send overdue notification for loan_id={loan.id}: {exc}"
+            )
 
     count = overdue_loans.count()
-    logger.info(f"Total overdue loans found: {count}")
-    return {"overdue_loans_count": count}
+    logger.info(
+        f"Overdue loans check complete: {count} overdue loans found, "
+        f"{emails_sent} emails sent, {emails_failed} failed"
+    )
+
+    return {
+        "overdue_loans_count": count,
+        "emails_sent": emails_sent,
+        "emails_failed": emails_failed,
+    }
 
 
 @shared_task
